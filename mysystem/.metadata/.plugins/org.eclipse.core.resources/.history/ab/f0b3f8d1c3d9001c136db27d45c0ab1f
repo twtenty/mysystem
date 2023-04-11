@@ -1,0 +1,148 @@
+package other;
+
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.io.BufferedWriter;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.net.Socket;
+import java.net.UnknownHostException;
+import java.util.Scanner;
+public class Client {
+	
+	static GuiClientMain guiMain=new GuiClientMain("登陆面板");
+	GuiClient gui = new GuiClient("陈佳瑶的聊天框");
+	static String userName = "chenjiayao";
+	static Socket client;
+	static OutputStream ous;
+	
+    public static void main(String[] args) {
+		
+		
+		try {
+			try {
+				
+				
+			} catch (Exception e) {
+				// TODO 自动生成的 catch 块
+				e.printStackTrace();
+			}
+			client=new Socket("localhost",8000);
+			
+			//获取客户端的IP与port
+			String clientIp=client.getLocalAddress().toString().substring(1);
+			int clientPort=client.getLocalPort();			
+			System.out.println("本客户端IP为:"+clientIp);			
+			System.out.println("本客户端Port为:"+clientPort);
+//			//注意这个clientIp前面有一个斜杆，还要处理下。
+			//按消息规则发送消息
+			String str="NEW/"+clientIp+"/"+clientPort+"/"+userName+"/";
+			
+			//获取一个字节输出流
+			OutputStream os=client.getOutputStream();
+			//将字节输出流转化为字符输出流
+			OutputStreamWriter osw=new OutputStreamWriter(os);
+			//将字符输出流转化为缓存流
+			DataOutputStream dos=new DataOutputStream(os);
+			//BufferedWriter bw=new BufferedWriter(osw);
+			//bw.write("我是张三，老师好");
+			Scanner sc = new Scanner(System.in);
+			while(true)
+			{
+				String st = sc.next();
+				str+="/"+st;
+				dos.writeUTF(str);
+				if(st.equals("end")) break;
+			}
+			
+			dos.writeUTF(str);
+
+			
+			dos.close();
+			//bw.close();
+			client.close();			
+		} catch (UnknownHostException e) {			
+			e.printStackTrace();
+		} catch (IOException e) {			
+			e.printStackTrace();
+		}
+	}
+	
+	public void login(){
+		try{	
+			guiMain.listenLoginButton(this);
+			guiMain.listenQuitButton(this);
+			
+			//首先要获取登录框中的内容，即用户输入的数据
+			
+			String severIP=guiMain.getAddress();
+			int serverPort=guiMain.getPort();
+			userName=guiMain.getUserName();
+			
+			System.out.println("severIP="+severIP);
+			System.out.println("serverPort="+serverPort);
+			System.out.println("userName="+userName);
+			client = new Socket(severIP,serverPort);
+
+			System.out.println("与服务器连接成功。。。。。。。。");
+			
+			
+			ous=client.getOutputStream();
+			DataOutputStream dataOut = new DataOutputStream(ous);
+			dataOut.writeUTF("IP为"+severIP+" ;  Port为"+serverPort+"的人在联系你。");	
+			dataOut.writeUTF("用户名是："+userName);
+			//这个IP前面带一个斜杆
+			//String clientIp=client.getLocalAddress().toString();
+			//下面代码将斜杆去掉。
+		
+			String clientIp=client.getLocalAddress().toString().substring(1);
+			int clientPort=client.getLocalPort();
+			System.out.println("我的IP是："+clientIp);
+			System.out.println("我的port是："+clientPort);
+			//登录界面退出	
+			guiMain.dispose();			
+			//聊天界面显示
+			//调用send按钮监听方法，那么点击send按钮就会跳到send()方法
+			gui.listenSendButton(this);
+			//点击close按钮就会跳到quit()方法
+			gui.listenCloseButton(this);
+			gui.setTitle(userName);
+			gui.showFrame();	
+			gui.addWindowListener(new WindowAdapter(){		
+				public void windowClosing(WindowEvent e) {				
+					quit();				
+				}			 
+			 });
+			
+		//	new Thread(new ReadThread()).start();
+			
+}catch(Exception e){
+			System.out.println(e);
+			System.out.println("连接有误，请检查服务器是否打开，或者服务器IP地址与端口号是否有误！");
+}
+}
+public void send(){
+	System.out.println("send");			
+	try {
+		String msg=gui.getSendMsg();
+		System.out.println("msg=="+msg);
+		ous=client.getOutputStream();
+		ous=client.getOutputStream();
+		DataOutputStream dataOut = new DataOutputStream(ous);
+		dataOut.writeUTF(userName+"说："+msg);		
+		gui.setSendMsgClear();	
+	} catch (IOException e) {
+		// TODO Auto-generated catch block
+		e.printStackTrace();
+	}		
+}
+
+	
+	public void quit() {
+		
+	}	
+}
+
+

@@ -1,0 +1,272 @@
+package server;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.ArrayList;
+import java.util.Iterator;
+
+import help.ClientInfo;
+import help.MessageBean;
+
+public class Server {
+	ServerSocket serverSocket = null;
+
+	ArrayList<ClientInfo> clientList = new ArrayList<ClientInfo>();
+
+
+	public Server() {
+		try {
+            serverSocket = new ServerSocket(8000);
+            new Thread(new StartServerThread()).start();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+	}
+
+	 class StartServerThread implements Runnable{
+
+	        public void run() {
+	            while(true) {
+	                try {
+	                    Socket clientSocket = serverSocket.accept();
+	                    new Thread(new ServerReadThread(clientSocket)).start();
+	                    
+
+
+	                } catch (IOException e) {
+	                    e.printStackTrace();
+	                }
+	            }
+	        }
+	    }
+
+
+
+	public class ConServerThread implements Runnable {
+		// 这是包含线程的服务器
+		ServerSocket serverSocket;
+		int count = 0;
+
+		public void startServer() {
+			try {
+				serverSocket = new ServerSocket(8000);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+
+		public void run() {
+			try {
+				while (true) {
+					Socket clientSocket = serverSocket.accept();
+					InputStream ins = clientSocket.getInputStream();
+					/*
+					 * 以下三行代码也可以接收字符流 InputStreamReader isr=new InputStreamReader(ins);
+					 * BufferedReader bfr=new BufferedReader(isr); String str= bfr.readLine();
+					 */
+					// 推荐使用下面方法接收字符
+					DataInputStream dis = new DataInputStream(ins);
+					while (true) {
+						String str = dis.readUTF();
+						int index1 = str.indexOf("/", 0);
+						if (index1 != -1) {
+							System.out.println("来自客户端的消息:" + str);
+							String head = str.substring(0, index1);
+							if ("NEW".equals(head)) {
+								MessageBean msgBean = new MessageBean();
+								msgBean = msgBean.openString(str);
+								String clientIP = msgBean.getIp();
+								String clientPort = msgBean.getPort();
+								String userName = msgBean.getUserName();
+								ClientInfo clientInfo = new ClientInfo();
+								clientInfo.setClientSocket(clientSocket);
+								clientInfo.setClientIP(clientIP);
+								clientInfo.setClientPort(clientPort);
+								clientInfo.setUserName(userName);
+								clientList.add(clientInfo);
+								sendNewToOld1(clientInfo, str);
+								sendOldToNew(clientInfo);
+							}else if("MSG".equals(head)) {
+								MessageBean msgBean = new MessageBean();
+								msgBean=msgBean.openString(str);
+								sendMsgToOne(msgBean,str);
+							}else if("QUT".equals(head)) {
+								MessageBean msgBean = new MessageBean();
+								msgBean=msgBean.openString(str);
+								sendQuit(msgBean,str);
+							}
+						} else {
+							System.out.println("你没有按消息格式发送了这样的消息:" + str);
+						}
+					}
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+	
+	public void sendQuit(MessageBean msgBean,String str){
+		String clientIP = msgBean.getIp();
+		String clientPort=msgBean.getPort();
+		Iterator iter = clientList.iterator();
+		while(iter.hasNext()) {
+			ClientInfo clientInfoIn = (ClientInfo)iter.next();
+			String IPInside=clientInfoIn.getClientIP();
+			String PortInside=clientInfoIn.getClientPort();
+			boolean flag1=clientIP.equals(IPInside);
+			boolean flag2=clientPort.equals(PortInside);
+			if(!flag1||(!flag2)) {
+				
+				try {
+					DataOutputStream dos = new DataOutputStream(clientInfoIn.getClientSocket().getOutputStream());
+					dos.writeUTF(str);
+				} catch (IOException e) {
+					// TODO 自动生成的 catch 块
+					e.printStackTrace();
+				}
+			}
+		}
+	}
+	
+	public void sendMsgToOne(MessageBean msgBean,String str) {
+		String clientIP = msgBean.getIp();
+		String clientPort=msgBean.getPort();
+		Iterator iter = clientList.iterator();
+		while(iter.hasNext()) {
+			ClientInfo clientInfoIn = (ClientInfo)iter.next();
+			String IPInside=clientInfoIn.getClientIP();
+			String PortInside=clientInfoIn.getClientPort();
+			boolean flag1=clientIP.equals(IPInside);
+			boolean flag2=clientPort.equals(PortInside);
+			if(flag1&&flag2) {
+				
+				try {
+					DataOutputStream dos = new DataOutputStream(clientInfoIn.getClientSocket().getOutputStream());
+					dos.writeUTF(str);
+				} catch (IOException e) {
+					// TODO 自动生成的 catch 块
+					e.printStackTrace();
+				}
+			}
+		}
+	}
+	
+	public void sendNewToOld1(ClientInfo clientInfoNew,String str) {
+		Iterator iter = clientList.iterator();
+		while(iter.hasNext()) {
+			ClientInfo clientInfoIn = (ClientInfo) iter.next();
+			if(clientInfoNew!=clientInfoIn) {
+				Socket clientSocketIn = clientInfoIn.getClientSocket();
+				try {
+					OutputStream ous = clientSocketIn.getOutputStream();
+					DataOutputStream dos = new DataOutputStream(ous);
+					dos.writeUTF(str);
+				}catch(IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+	}
+	
+
+
+	public void sendOldToNew(ClientInfo clientInfo) {
+		Iterator iter = clientList.iterator();
+		while (iter.hasNext()) {
+			ClientInfo clientInfoOld = (ClientInfo) iter.next();
+			if (clientInfo != clientInfoOld) {
+				try {
+					OutputStream ops = clientInfo.getClientSocket().getOutputStream();
+					DataOutputStream dos = new DataOutputStream(ops);
+					String head = "OLD";
+					String ip = clientInfoOld.getClientIP();
+					String port = clientInfoOld.getClientPort();
+					String userName = clientInfoOld.getUserName();
+					MessageBean msgBean = new MessageBean();
+					msgBean.setHead(head);
+					msgBean.setIp(ip);
+					msgBean.setPort(port);
+					msgBean.setUserName(userName);
+					String str = msgBean.buildString(msgBean);
+					System.out.println("str=" + str);
+					dos.writeUTF(str);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+		}
+	}
+
+	class ServerReadThread implements Runnable {
+		Socket clientSocket;
+
+		public ServerReadThread(Socket clientSocket) {
+			this.clientSocket = clientSocket;
+		}
+
+		public void run() {
+			try {
+				InputStream ins = clientSocket.getInputStream();
+				DataInputStream dataIn = new DataInputStream(ins);
+				while (true) {
+					String str = null;
+					if (dataIn.available() > 0)
+						str = dataIn.readUTF();
+					if (str != null)
+						System.out.println(str);
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+
+	}
+
+	public void startServer() {
+		try {
+			serverSocket = new ServerSocket(8000);
+
+			new Thread(new StartServerThread()).start();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void endServer() {
+		System.exit(0);
+	}
+
+	public static void main(String[] args) {
+		new GuiServer();
+
+	}
+	
+	public void sendMsgToAll1(MessageBean msgBean,String str) {
+		System.out.println("sendMsgToAll1......");
+		String senderIP=msgBean.getIp();
+		String sernderPort=msgBean.getPort();
+		Iterator iter=clientList.iterator();
+		while(iter.hasNext()) {
+			ClientInfo clientInfoIN=(ClientInfo)iter.next();
+			String IPInside=clientInfoIN.getClientIP();
+			String PortInside=clientInfoIN.getClientPort();
+			boolean flag1=senderIP.equals(IPInside);
+			boolean flag2=sernderPort.equals(PortInside);
+			if(!flag1||(!flag2)) {
+				try {
+					DataOutputStream dos = new DataOutputStream(clientInfoIN.getClientSocket().getOutputStream());
+					dos.writeUTF(str);
+				}catch(IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+	}
+}

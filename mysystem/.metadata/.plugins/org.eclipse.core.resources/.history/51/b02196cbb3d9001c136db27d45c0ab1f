@@ -1,0 +1,131 @@
+package other;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.ServerSocket;
+import java.net.Socket;
+
+public class Server {
+	ServerSocket serverSocket;
+	GuiServer gs = new GuiServer();
+	
+
+	public  Server() {
+		try {
+			
+			gs.startButListenter(this);
+			gs.endButtonListenter(this);
+			serverSocket = new ServerSocket(8000);
+			new Thread(new StartServerThread()).start();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+
+
+
+class StartServerThread implements Runnable{
+	int count=0;
+	public void run() {
+		while(true){				
+			try {
+				Socket clientSocket=serverSocket.accept();		
+				InputStream ins=clientSocket.getInputStream();	
+				DataInputStream dataIn = new DataInputStream(ins);
+				String str= dataIn.readUTF();			
+				System.out.println("这是从客户端传过来的信息："+str);
+				
+				count++;
+				System.out.println("这是第"+count+"个连接客户");
+			} catch (IOException e) {					
+				e.printStackTrace();
+			}
+		}
+	}
+}
+
+class ConServerThread implements Runnable{
+	//这是包含线程的服务器
+	ServerSocket serverSocket;
+	int count=0;
+	public void startServer(){
+		try {
+			 serverSocket=new ServerSocket(8000);			 
+		} catch (IOException e) {			
+			e.printStackTrace();
+		}		
+	}	
+	public void run() {			
+		try {						
+			while(true){				
+				Socket clientSocket=serverSocket.accept();			
+				InputStream ins=clientSocket.getInputStream();
+				/*以下三行代码也可以接收字符流
+				InputStreamReader isr=new InputStreamReader(ins);					
+				BufferedReader bfr=new BufferedReader(isr);					 
+				String str= bfr.readLine();		
+				*/
+				//推荐使用下面方法接收字符
+				DataInputStream dis=new DataInputStream(ins);
+				String str=dis.readUTF();
+				System.out.println("这是从客户端传过来的信息："+str);
+				
+				count++;
+				System.out.println("这是第"+count+"个连接客户");
+			}				
+		} catch (IOException e) {			
+			e.printStackTrace();
+		}
+	}
+}
+
+class ServerReadThread implements Runnable {
+	Socket clientSocket;
+
+	public ServerReadThread(Socket clientSocket) {
+		this.clientSocket = clientSocket;
+	}
+
+	public void run() {
+		try {
+			InputStream ins = clientSocket.getInputStream();
+			DataInputStream dataIn = new DataInputStream(ins);
+			while (true) {					
+				String str =null;
+				if(dataIn.available()>0)
+					str=dataIn.readUTF();
+				if(str!=null)
+				  System.out.println(str);
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	
+}
+
+public void startServer() {
+	try {
+		serverSocket=new ServerSocket(8000);
+		new Thread(new StartServerThread()).start();			
+	} catch (IOException e) {
+		e.printStackTrace();
+	}	
+}
+
+public void endServer(){
+	System.exit(0);
+}
+
+
+public static void main(String[] args) {
+	new Server();
+}
+}
+
+
+
+
+
